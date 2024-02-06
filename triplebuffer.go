@@ -5,6 +5,7 @@ import (
 )
 
 // Buffer is a triple buffer! Enjoy!
+//
 // A Buffer has three (private) fields, to wit:
 //   - back: the Back buffer, which is whatever a producer is working on.
 //     This is a pointer, so it is modifiable after setting without any extra work.
@@ -19,9 +20,6 @@ import (
 //   - front: the Front buffer. Whatever is in here will be returned by Read if there is no
 //     pending data in the Middle buffer. If there is pending data in Middle, that data gets promoted
 //     and returned by Read.
-//
-// Note that Commit can (and, likely at some point *will*) overwrite whatever is in the Middle buffer,
-// even if that data is still pending a read.
 type Buffer[T any] struct {
 	back *T
 	// using atomics is fun and exciting! ...
@@ -40,7 +38,7 @@ func NewBuffer[T any]() *Buffer[T] {
 }
 
 // NewBufferWithFront returns a Buffer with the Front buffer populated,
-// (ie it's ready to CONSUME!)
+// and ready to be consumed via Buffer.Read.
 func NewBufferWithFront[T any](front *T) *Buffer[T] {
 	b := new(Buffer[T])
 	b.front = front
@@ -48,10 +46,10 @@ func NewBufferWithFront[T any](front *T) *Buffer[T] {
 	return b
 }
 
-// NewPopulatedBuffer returns a fully populated Buffer.
-// Good luck.
-// Note: the Middle buffer item (`middle`) will be considered Pending
-// (ie. fresh off the line from a producer, and subject to swappage when Buffer.Read is called).
+// NewPopulatedBuffer returns a fully populated Buffer,
+// or as populated as the caller makes it, as nil is a valid value for all three params.
+//
+// Note: the Middle buffer item (`middle`) will be considered Pending unless it is nil.
 func NewPopulatedBuffer[T any](back, middle, front *T) *Buffer[T] {
 	b := new(Buffer[T])
 
@@ -67,13 +65,16 @@ func NewPopulatedBuffer[T any](back, middle, front *T) *Buffer[T] {
 
 // Read is part of the consumer API.
 // It returns the value currently in the Front buffer.
+//
 // If the value currently in the Middle buffer is pending,
-// (ie. it has just been written to by a producer)
+// (it has just been commited by a producer)
 // then the Front and Middle buffers will be swapped and the *new* Front buffer returned.
 // Otherwise, the stale Front buffer value will be returned.
+//
 // If there is no value in the Middle buffer, no swap occurs.
 // The returned boolean corresponds to whether the value is
-// "stale": false, or "pending": true.
+//   - "stale": false
+//   - "pending": true.
 func (b *Buffer[T]) Read() (*T, bool) {
 	var dirtyRead bool
 
@@ -92,17 +93,27 @@ func (b *Buffer[T]) Read() (*T, bool) {
 }
 
 // Write is part of the producer API,
+//
 // It is passed a pointer to the data currently being "produced", whatever that may be.
+//
 // Once the production is finished, then Buffer.Commit must be called to commit
 // the new Back buffer to the Middle buffer.
 func (b *Buffer[T]) Write(data *T) {
 	b.back = data
 }
 
-// Commit is called once whatever data in the Back buffer has finished being created.
+// Commit is part of the producer API.
+//
+// It is called by the producer when it has finished working on (producing)
+// data which is in the Back buffer, and is ready to be moved to the Middle for
+// consumption.
+//
 // On commit, the following happens:
-// Back buffer is promoted to the Middle buffer.
-// Middle buffer is swapped into the Back buffer, which is more or less useless.
+//   - Back buffer data is promoted to the Middle buffer by atomic swap.
+//   - Middle buffer data is moved into the Back buffer.
+//
+// Note that Commit can (and, likely at some point *will*) overwrite whatever is in the Middle buffer,
+// even if that data is still pending.
 func (b *Buffer[T]) Commit() {
 	if b.back == nil {
 		panic("cannot commit nil back buffer data")
