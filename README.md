@@ -1,5 +1,7 @@
 # triplebuffer
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/jalavosus/triplebuffer.svg)](https://pkg.go.dev/github.com/jalavosus/triplebuffer)
+
 `go get github.com/jalavosus/triplebuffer`
 
 An attempt at writing a triple buffer system in Go, mainly just to see if 
