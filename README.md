@@ -8,7 +8,7 @@ An attempt at writing a triple buffer system in Go, mainly just to see if
 I could do it, make it work, AND test it.
 
 There are GoDocs for all public things, a fairly extensive set of tests,
-and a very basic usage example in [cmd/main.go](./cmd/main.go).
+and a very basic usage example in [example_test.go](./example_test.go).
 
 Don't use this in production without personally vetting it. Please. I beg you.
 
